@@ -1,0 +1,51 @@
+# Supabase config — ja-cooperativa
+# Veja: https://supabase.com/docs/reference/cli/config
+
+project_id = "ja-cooperativa"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 16
+
+[db.pooler]
+enabled = true
+port = 54329
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://ja-cooperativa.vercel.app"]
+jwt_expiry = 3600
+refresh_token_rotation_enabled = true
+
+[auth.email]
+enable_signup = false
+enable_confirmations = true
+double_confirm_changes = true
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
+inspector_port = 8083
+
+[experimental]
+webhooks = { enabled = true }
