@@ -22,32 +22,33 @@ Sistema enterprise para cooperativas operarem:
 
 | Modo | Quem usa | Como entra dados |
 |------|----------|------------------|
-| **SIMPLIFICADO** | Cooperado que **não** usa JA-Agro | Apenas o que a cooperativa registra (entregas, ATR, laudos) |
-| **INTEGRADO** | Cooperado **usuário do JA-Agro** | Sincronização automática via SSO + outbox + FDW |
+| **SIMPLIFICADO** | Cooperado que **não** usa JA-Agro | Apenas o que a cooperativa registra |
+| **INTEGRADO** | Cooperado **usuário do JA-Agro** | Sincronização automática via SSO + bridges |
 
-## 📐 Arquitetura
+## 📐 Arquitetura (Opção C')
 
-> **Opção C — Federação real:** repo separado, Supabase project separado, integrado ao JA-Agro via SSO + FDW + Outbox.
+> **Mesmo Supabase project** do Produtor, **schemas Postgres isolados**:
+> - schema `public` — Produtor (JA-Agro)
+> - schema `cooperativa` — este módulo
+> - schema `bridge` — funções SECURITY DEFINER que mediam o contato
 
-Veja [`docs/cooperativa/01-visao-arquitetura.md`](./docs/cooperativa/01-visao-arquitetura.md).
+Veja [`docs/cooperativa/01-arquitetura-addendum.md`](./docs/cooperativa/01-arquitetura-addendum.md) e
+[`04-federacao-sso.md`](./docs/cooperativa/04-federacao-sso.md).
 
 ## 📦 Stack 2026
 
-PostgreSQL 16 + pgvector + PostGIS + pgmq · Supabase Edge (Deno + Hono) · Supabase Realtime + WebTransport · HTML + Alpine + HTMX + Vanilla · PWA + Dexie + Automerge (CRDT offline) · MapLibre + Protomaps · Claude + pgvector + Hono agents · GitHub Actions + Vercel.
+PostgreSQL 16 + pgvector + PostGIS + pgmq · Supabase Edge (Deno + Hono) · Supabase Realtime + WebTransport · HTML + Alpine + HTMX + Vanilla · PWA + Dexie + Automerge (CRDT offline) · MapLibre + Protomaps · Claude + pgvector + Hono agents · GitHub Actions + Vercel/Pages.
 
-Veja [`docs/cooperativa/02-stack-tecnologica.md`](./docs/cooperativa/02-stack-tecnologica.md).
-
-## 📁 Estrutura de pastas
+## 📁 Estrutura
 
 ```
 ja-cooperativa/
-├── docs/cooperativa/      → spec técnica completa (11 arquivos)
+├── docs/cooperativa/      → spec técnica (11 arquivos)
 ├── assets/
 │   ├── css/                → design system + componentes
-│   └── js/                 → core (auth, api, app, agents)
-├── pages/                  → 14 módulos do sidebar
+│   └── js/                 → app + api + auth + módulos
 ├── supabase/
-│   ├── migrations/         → schema SQL versionado
+│   ├── migrations/         → 001_initial.sql + 002_seed.sql
 │   └── functions/          → Edge Functions (agentes IA)
 ├── .github/workflows/      → CI/CD
 ├── index.html              → landing/login
@@ -57,29 +58,25 @@ ja-cooperativa/
 └── CLAUDE.md               → contexto para IA
 ```
 
-## 📜 Spec técnica
+## 🚀 Como rodar (depois de aplicar migrations)
 
-A spec completa do módulo está em [`docs/cooperativa/`](./docs/cooperativa/):
+1. **Aplicar schema no Supabase do Produtor** (`zpgabskeunywcgtojcrg`):
+   - Rodar `supabase/migrations/001_initial.sql`
+   - Rodar `supabase/migrations/002_seed.sql` (dev only)
+2. **Atualizar `assets/js/config.js`** com a anon key correta
+3. **Servir os arquivos estáticos** (Pages, Vercel ou qualquer HTTP server)
 
-- [00 - README (índice)](./docs/cooperativa/00-README.md)
-- [01 - Visão & Arquitetura](./docs/cooperativa/01-visao-arquitetura.md)
-- [02 - Stack Tecnológica](./docs/cooperativa/02-stack-tecnologica.md)
-- [03 - Modelo de Dados](./docs/cooperativa/03-modelo-dados.md)
-- [04 - Federação & SSO](./docs/cooperativa/04-federacao-sso.md)
-- [05 - IA Ativa (Agentes)](./docs/cooperativa/05-ia-ativa-agentes.md)
-- [06 - Dashboards & Semáforos](./docs/cooperativa/06-dashboards-semaforos.md)
-- [07 - Módulos Funcionais](./docs/cooperativa/07-modulos-funcionais.md)
-- [08 - Rastreabilidade & Blockchain](./docs/cooperativa/08-rastreabilidade-blockchain.md)
-- [09 - UX & Design](./docs/cooperativa/09-ux-design.md)
-- [10 - Roadmap & MVP](./docs/cooperativa/10-roadmap-mvp.md)
-
-## 🚀 Status
+## 📜 Status
 
 - [x] Spec técnica completa (11 arquivos)
-- [x] Repo inicializado
-- [ ] Bootstrap do projeto (em andamento)
-- [ ] Supabase project criado
-- [ ] MVP fase 1 (Cooperados + Dashboard)
+- [x] Bootstrap do projeto
+- [x] Migration inicial pronta (schema `cooperativa`)
+- [x] Bridge inicial pronta (`read_produtor_perfil`)
+- [x] Dashboard Executivo (KPIs + semáforos)
+- [x] Módulo Cooperados (lista + visão 360° com 7 abas)
+- [ ] Aplicar migrations no Supabase (manual)
+- [ ] Anon key real em config.js
+- [ ] Módulos: Produção, Entregas, Comercial, Qualidade, etc.
 
 ## 📝 Licença
 
