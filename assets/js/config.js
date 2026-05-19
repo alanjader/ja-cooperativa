@@ -1,4 +1,34 @@
 /* JA Cooperativa - Config global
+ * Opcao C\'': mesmo Supabase do Produtor, schema "cooperativa" isolado.
+ * Migrado para o novo padrao de keys do Supabase (2025+):
+ *   - publishableKey (sb_publishable_...) substitui a antiga anonKey/JWT.
+ *   - secret keys (sb_secret_...) NUNCA devem aparecer aqui.
+ */
+window.JA_COOP_CONFIG = {
+  app: {
+    name: "JA Cooperativa",
+    version: "0.3.0",
+    env: location.hostname === "localhost" ? "dev" : "prod"
+  },
+  supabase: {
+    // MESMO projeto do Produtor (Opcao C\''), schema cooperativa isolado.
+    url: "https://gohoqgctcqltorfeohom.supabase.co",
+    publishableKey: "sb_publishable_7SUqbx9ZQoa44Ohh_o6zmw_E_g8Vzl-",
+    schema: "cooperativa"
+  },
+  produtor: {
+    url: "https://gohoqgctcqltorfeohom.supabase.co",
+    schema: "public"
+  },
+  features: {
+    aiAgents: true,
+    realtime: true,
+    offline: false,
+    blockchain: false
+  },
+  devCooperativaId: "00000000-0000-0000-0000-000000000001"
+};
+/* JA Cooperativa - Config global
  * Opção C': mesmo Supabase do Produtor, schema 'cooperativa' isolado.
  */
 window.JA_COOP_CONFIG = {
