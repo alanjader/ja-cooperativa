@@ -1,153 +1,120 @@
-# 04 — Federação e SSO
+# 04 — Federação & SSO
 
-> Como o Cooperativa conversa com o Produtor (e futuramente com o Agenda) sem virar um monolito.
+> **Atualizado:** decisão final é **Opção C'** — mesmo Supabase project, schemas isolados.
+> Mantemos zero acoplamento de tabelas via separação de **schemas Postgres**, mas
+> evitamos o overhead/custo de um projeto Supabase adicional.
 
-## 1. Três dimensões de federação
-
-1. **Identidade** — SSO unificado JA Agrotec.
-2. **Dados** — leitura compartilhada via Foreign Data Wrappers.
-3. **Eventos** — escrita propaga via outbox pattern + webhooks.
-
-## 2. SSO unificado
-
-### 2.1 Opção escolhida: **JWT shared secret + claim de módulos**
-
-- Cada Supabase é um projeto separado, mas todos validam o mesmo JWT.
-- Usuário loga em `auth.jaagrotec.com.br` (Auth Hub) -> recebe JWT com claims:
-
-```json
-{
-  "sub": "<auth_user_id>",
-  "email": "user@coop.com.br",
-  "modulos": {
-    "produtor":     {"cooperado_id": "...", "papel": "admin"},
-    "cooperativa": {"cooperativa_id": "...", "papel": "gerente"},
-    "agenda":      null
-  },
-  "exp": 1716000000
-}
-```
-
-- Cada Supabase configura `JWT_SECRET` igual ou usa **assimetria** (RS256) com chave pública compartilhada — preferível.
-- Token válido por 1h, refresh por 30 dias.
-
-### 2.2 Switch de módulo
-
-- Header da UI tem dropdown "JA AGROTEC" -> Produtor / Cooperativa / Agenda.
-- Trocar = mudar de subdomain (`produtor.jaagrotec.com.br` -> `cooperativa.jaagrotec.com.br`) carregando mesmo JWT.
-- Cookie de sessão no domínio raiz `.jaagrotec.com.br`.
-
-### 2.3 Provisionamento automático
-
-Quando um produtor (cooperado integrado) vira cooperado de uma cooperativa:
-
-1. Convite enviado por email.
-2. Produtor aceita -> Edge Function chama:
-   - INSERT em `cooperados` (cooperativa)
-   - INSERT em `consentimentos` (produtor)
-   - Atualiza JWT claim `modulos.cooperativa`.
-
-## 3. Federação de dados (FDW)
-
-### 3.1 Arquitetura
+## 1. Topologia
 
 ```
-  [Supabase Cooperativa]      <----- read-only ----->     [Supabase Produtor]
-      schema federation                                       schema public
-         |                                                       |
-         | postgres_fdw via PgBouncer                            |
-         |                                                       |
-         +---> SELECT * FROM federation.fazendas WHERE ...      |
+┌──────────────────────────────────────────────────────┐
+│  SUPABASE PROJECT  zpgabskeunywcgtojcrg  │
+│                                                                         │
+│  ┌──────────────┐   ┌──────────────────┐   ┌──────────────────┐    │
+│  │  schema:    │   │   schema:        │   │   schema:        │    │
+│  │  public     │   │   cooperativa    │   │   bridge         │    │
+│  │  (Produtor) │   │   (este módulo)   │   │   (SECURITY DEF) │    │
+│  └──────────────┘   └──────────────────┘   └──────────────────┘    │
+│         │                  │                     │             │
+│         └────────────────┼──────────────────────┘             │
+│                            │                                       │
+│                       acesso só por                                  │
+│                       funções bridge                                  │
+└───────────────────────────────────────────────────────┘
+
+  Frontend Produtor       → search_path = public
+  Frontend Cooperativa    → search_path = cooperativa, public(somente leitura via bridge)
 ```
 
-### 3.2 Tabelas espelhadas (somente-leitura)
+## 2. Vantagens vs FDW (Opção C original)
 
-| Tabela remota (Produtor) | Local FDW (Cooperativa) | Uso |
-|---|---|---|
-| `fazendas` | `federation.fazendas` | Mapa de cooperados |
-| `talhoes` | `federation.talhoes` | Geo + NDVI |
-| `safras` | `federation.safras` | Previsão produção |
-| `lancamentos` | `federation.lancamentos` | Lançamentos op |
-| `vendas_graos` | `federation.vendas_graos` | Comercial |
-| `qualidade_registro` | `federation.qualidade_registro` | Qualidade |
-| `documentos` | `federation.documentos` | Anexos |
+| Critério | FDW (2 projetos) | **Schema isolado (escolhido)** |
+|---------|------------------|--------------------------------|
+| Custo Supabase | 2 projetos | 1 projeto |
+| Latência entre módulos | TCP/SSL extra | nativo Postgres |
+| Transacionalidade entre módulos | não | sim, quando fizer sentido |
+| Backup/restore | separados | unificado |
+| Auth/JWT | replicar config | compartilhado |
+| Storage | 2 buckets | mesmo bucket com prefixos |
+| Risco de acoplamento | baixo | controlado por bridges |
+| Migrações | desacopladas | versionadas no mesmo repo do dono do schema |
 
-### 3.3 RLS sobre FDW
+## 3. Convenções de schema
 
-- Cooperativa só vê linhas onde:
-  - `cooperado.produtor_id_externo = federation.fazendas.cooperado_id` **E**
-  - `consentimentos_cooperado.<flag> = true` para aquele tipo de dado.
+- Schema `public`: pertence ao **Produtor**. Cooperativa **não escreve direto**.
+- Schema `cooperativa`: tudo desta plataforma vive aqui (tabelas, funções, views, MVs).
+- Schema `bridge`: contem **APENAS funções SECURITY DEFINER** que projetam dados de um lado para o outro. É a única superfície de contato.
 
-- Implementado via views materializadas filtradas:
+## 4. Bridges (funções SECURITY DEFINER)
+
+### Produtor → Cooperativa
 
 ```sql
-CREATE MATERIALIZED VIEW mv_dados_compartilhados AS
-SELECT f.* FROM federation.fazendas f
-JOIN cooperados c ON c.produtor_id_externo = f.cooperado_id
-JOIN federation.consentimentos cs ON cs.cooperado_id = c.produtor_id_externo
-WHERE cs.area_e_talhoes = true;
+-- Quando uma entrega do produtor for relevante para a cooperativa
+create or replace function bridge.publish_entrega_to_coop(
+  p_produtor_user_id uuid,
+  p_payload jsonb
+) returns void
+language plpgsql
+security definer
+set search_path = cooperativa, public
+as $$
+begin
+  insert into cooperativa.entregas_inbox (produtor_user_id, payload, recebido_em)
+  values (p_produtor_user_id, p_payload, now());
+end;
+$$;
 
-REFRESH MATERIALIZED VIEW CONCURRENTLY mv_dados_compartilhados;  -- via pg_cron
+revoke all on function bridge.publish_entrega_to_coop from public;
+grant execute on function bridge.publish_entrega_to_coop to authenticated;
 ```
 
-## 4. Outbox Pattern (eventos críticos)
-
-### 4.1 Modelo
-
-No Produtor:
+### Cooperativa → Produtor (leitura snapshot)
 
 ```sql
-CREATE TABLE outbox (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  evento text NOT NULL,
-  payload jsonb NOT NULL,
-  destino text NOT NULL,    -- cooperativa, agenda
-  enviado_em timestamptz,
-  tentativas int DEFAULT 0,
-  criado_em timestamptz DEFAULT now()
-);
+-- Lê perfil básico do produtor para popular tela de cooperado integrado
+create or replace function bridge.read_produtor_perfil(p_user_id uuid)
+returns table (nome text, propriedades_count int, ultima_atividade timestamptz)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    u.nome,
+    (select count(*) from propriedades p where p.user_id = u.id),
+    (select max(criado_em) from atividades a where a.user_id = u.id)
+  from usuarios u
+  where u.id = p_user_id;
+$$;
 
--- trigger após INSERT em qualidade_registro:
-INSERT INTO outbox (evento, payload, destino) VALUES
-  ('qualidade.criada', row_to_json(NEW)::jsonb, 'cooperativa');
+revoke all on function bridge.read_produtor_perfil from public;
+grant execute on function bridge.read_produtor_perfil to authenticated;
 ```
 
-Worker Edge Function (Produtor) consome outbox e POSTa webhook na Cooperativa:
+> Regra: bridges são **a única forma** de um schema acessar dados do outro.
+> Nada de `SELECT public.tabela` direto vindo do client da cooperativa.
 
-```
-POST https://coop.supabase.co/functions/v1/inbound
-X-JA-Signature: <hmac-sha256>
-Body: { "evento": "qualidade.criada", "payload": {...} }
-```
+## 5. SSO
 
-Cooperativa recebe, valida assinatura, escreve em `inbox` e processa.
+- **Mesmo Supabase Auth**: usuário entra com mesmo e-mail em ambos os apps.
+- **JWT claims**: `cooperativa_id` (multi-tenant), `is_cooperativa_admin`, `is_produtor`, `roles[]`
+- **Switcher**: o produtor que também é cooperado pode trocar de contexto (produtor ↔ cooperativa) sem relogar.
 
-### 4.2 Eventos catalogados
+## 6. Realtime
 
-| Evento (Produtor -> Coop) | Quando | Aciona na Coop |
-|---|---|---|
-| `cooperado.atualizado` | mudança no perfil do produtor | atualiza cache local |
-| `qualidade.criada` | novo laudo | reavalia score qualidade |
-| `entrega.realizada` | nova entrega | atualiza contrato |
-| `talhao.geom_atualizada` | mudou geometria | refresh mapa |
-| `safra.fechada` | safra encerrada | gera dossiê |
-| `consentimento.revogado` | produtor revogou flag | sync RLS imediato |
+- Cooperativa assina canais com prefixo `coop:`
+- Produtor assina canais com prefixo `prod:`
+- Bridges podem **disparar eventos cross-schema** via `pg_notify` + worker dedicado.
 
-## 5. Segurança
+## 7. Storage
 
-- **Webhook signing**: HMAC-SHA256 com secret rotacionado a cada 90 dias.
-- **mTLS** entre Edge Functions quando disponível.
-- **FDW user** somente-leitura, mapeado para role `fdw_reader` no Produtor.
-- **Network**: PgBouncer + IP allowlist (apenas Supabase regions).
-- **Audit**: cada chamada FDW é logada em `audit.fdw_calls`.
+- Bucket único `ja-agro`, prefixos:
+  - `producer/{user_id}/...`
+  - `coop/{cooperativa_id}/cooperados/{cooperado_id}/...`
+- Políticas RLS de Storage espelham as regras de RLS do banco.
 
-## 6. Resiliência
+## 8. Migração e versionamento
 
-- Se Produtor cair, Cooperativa continua operando com cache local (MVs).
-- Outbox tem retry exponencial (max 24h).
-- Healthcheck em `/healthz` em cada Edge Function.
-- Dashboard de federação no admin: "Último evento recebido há X min".
-
----
-
-_Próximo: `05-ia-ativa-agentes.md`._
+- Migrações do schema `cooperativa` vivem **neste repo** (`supabase/migrations/`).
+- Migrações do schema `public` vivem no repo do Produtor.
+- Migrações do schema `bridge` podem morar em qualquer dos dois — convenção: do lado que **cria** a função.
