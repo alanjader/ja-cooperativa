@@ -1,0 +1,26 @@
+{
+  "_doc": "Template publico. Copie para parametros.json e preencha os valores reais.",
+  "app": {
+    "name": "JA Cooperativa",
+    "version": "0.0.0",
+    "env": "dev"
+  },
+  "supabase": {
+    "url": "https://YOUR_PROJECT.supabase.co",
+    "publishableKey": "sb_publishable_REPLACE_ME",
+    "schema": "cooperativa"
+  },
+  "produtor": {
+    "url": "https://YOUR_PROJECT.supabase.co",
+    "schema": "public"
+  },
+  "features": {
+    "aiAgents": true,
+    "realtime": true,
+    "offline": false,
+    "blockchain": false
+  },
+  "dev": {
+    "cooperativaId": "00000000-0000-0000-0000-000000000001"
+  }
+}
