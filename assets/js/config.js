@@ -1,26 +1,31 @@
 /* JA Cooperativa - Config global
- * Substitua os valores reais quando o Supabase project for criado.
+ * Opção C': mesmo Supabase do Produtor, schema 'cooperativa' isolado.
  */
 window.JA_COOP_CONFIG = {
   app: {
     name: 'JA Cooperativa',
-    version: '0.1.0-bootstrap',
+    version: '0.2.0',
     env: location.hostname === 'localhost' ? 'dev' : 'prod'
   },
   supabase: {
-    // TODO: trocar pelos valores reais do projeto Supabase de cooperativa
-    url: 'https://YOUR_PROJECT.supabase.co',
-    anonKey: 'YOUR_ANON_KEY'
+    // MESMO projeto Supabase do Produtor
+    url: 'https://zpgabskeunywcgtojcrg.supabase.co',
+    // TODO: trocar pela anon key real (segura para client)
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.PLACEHOLDER_ANON_KEY',
+    // Schema dedicado deste módulo
+    schema: 'cooperativa'
   },
   produtor: {
-    // Federação com JA Agrotec Produtor
+    // Mesmo Supabase, schema 'public'
     url: 'https://alanjader.github.io/ja-agro',
-    supabaseUrl: 'https://zpgabskeunywcgtojcrg.supabase.co'
+    schema: 'public'
   },
   features: {
     aiAgents: true,
     realtime: true,
     offline: true,
-    blockchain: false  // anchoring opt-in
-  }
+    blockchain: false
+  },
+  /** Cooperativa demo para dev (substituir por JWT claim em prod) */
+  devCooperativaId: '00000000-0000-0000-0000-000000000001'
 };
