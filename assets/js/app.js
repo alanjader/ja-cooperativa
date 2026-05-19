@@ -1,99 +1,69 @@
-/* JA Cooperativa - Shell / Router */
-import { auth } from './auth.js';
-import { api }  from './api.js';
+/* JA Cooperativa - App shell (hash router + sidebar) */
 import { renderDashboard } from './dashboard.js';
-import { renderCooperadosList, renderCooperadoDetail } from './cooperados.js';
+import { renderCooperados, renderCooperado360 } from './cooperados.js';
+import { renderProducao } from './producao.js';
+import { renderEntregas } from './entregas.js';
 
-const $ = (sel, root = document) => root.querySelector(sel);
-
-const MENU = [
-  { id: 'dashboard',     label: 'Dashboard',      icon: '📊' },
-  { id: 'cooperados',    label: 'Cooperados',     icon: '👥' },
-  { id: 'producao',      label: 'Produção',       icon: '🌾' },
-  { id: 'entregas',      label: 'Entregas',       icon: '🚚' },
-  { id: 'comercial',     label: 'Comercial',      icon: '💰' },
-  { id: 'qualidade',     label: 'Qualidade',      icon: '✨' },
-  { id: 'certificacoes', label: 'Certificações',  icon: '🏅' },
-  { id: 'auditorias',    label: 'Auditorias',     icon: '🔍' },
-  { id: 'atr',           label: 'Assistência Técnica', icon: '👨‍🌾' },
-  { id: 'documentos',    label: 'Documentos',     icon: '📄' },
-  { id: 'inteligencia',  label: 'Inteligência',    icon: '🧠' },
-  { id: 'alertas',       label: 'Alertas',        icon: '🔔' },
-  { id: 'relatorios',    label: 'Relatórios',     icon: '📈' },
-  { id: 'ia',            label: 'IA Operacional', icon: '🤖' }
+const NAV = [
+  { href: '#/dashboard',  label: 'Dashboard',       icon: 'D' },
+  { href: '#/cooperados', label: 'Cooperados',      icon: 'C' },
+  { href: '#/producao',   label: 'Producao',        icon: 'P' },
+  { href: '#/entregas',   label: 'Entregas',        icon: 'E' },
+  { href: '#/comercial',  label: 'Comercial',       icon: 'V', stub: true },
+  { href: '#/qualidade',  label: 'Qualidade',       icon: 'Q', stub: true },
+  { href: '#/certificacoes', label: 'Certificacoes', icon: 'K', stub: true },
+  { href: '#/auditorias', label: 'Auditorias',      icon: 'A', stub: true },
+  { href: '#/atr',        label: 'ATR',             icon: 'T', stub: true },
+  { href: '#/documentos', label: 'Documentos',      icon: 'O', stub: true },
+  { href: '#/inteligencia', label: 'Inteligencia',  icon: 'I', stub: true },
+  { href: '#/alertas',    label: 'Alertas',         icon: 'L', stub: true },
+  { href: '#/relatorios', label: 'Relatorios',      icon: 'R', stub: true },
+  { href: '#/ia',         label: 'IA Operacional',  icon: 'X', stub: true },
 ];
 
-function renderSidebar(activeId) {
-  $('#sidebar').innerHTML = `
-    <div class="sidebar__brand">
-      <span style="color:var(--color-primary-600);font-size:1.5rem">🌱</span>
-      <span>JA Cooperativa</span>
-    </div>
-    <nav class="sidebar__group">
-      <div class="sidebar__group-title">Menu</div>
-      ${MENU.map(m => `
-        <a href="#/${m.id === 'dashboard' ? '' : m.id}" class="sidebar__link ${m.id === activeId ? 'sidebar__link--active' : ''}">
-          <span class="sidebar__icon">${m.icon}</span>
-          <span>${m.label}</span>
-        </a>
-      `).join('')}
-    </nav>
-    <div style="margin-top:auto;padding:var(--s-4) var(--s-5);border-top:1px solid var(--color-border)">
-      <div id="user-info" class="text-soft" style="font-size:var(--fs-xs)"></div>
-      <button class="btn btn--ghost btn--sm" id="btn-logout" style="margin-top:var(--s-2);width:100%;justify-content:flex-start">
-        Sair
-      </button>
-    </div>
-  `;
-  $('#btn-logout')?.addEventListener('click', () => auth.signOut());
-}
-
 function parseRoute() {
-  const hash = location.hash.replace(/^#\//, '');
-  const parts = hash.split('/').filter(Boolean);
-  return { id: parts[0] || 'dashboard', param: parts[1] };
+  const h = (location.hash || '#/dashboard').replace(/^#\//, '');
+  const parts = h.split('/').filter(Boolean);
+  return { module: parts[0] || 'dashboard', a: parts[1] || null, b: parts[2] || null };
 }
 
-async function renderPage() {
-  const route = parseRoute();
-  renderSidebar(route.id);
-  const main = $('#main');
-
-  // Dashboard
-  if (route.id === 'dashboard') return renderDashboard(main);
-  // Cooperados - lista ou detalhe
-  if (route.id === 'cooperados') {
-    if (route.param) return renderCooperadoDetail(main, route.param);
-    return renderCooperadosList(main);
-  }
-
-  // Módulos ainda não implementados
-  const item = MENU.find(m => m.id === route.id) || MENU[0];
-  main.innerHTML = `
-    <div class="page-header">
-      <div>
-        <div class="page-title">${item.icon} ${item.label}</div>
-        <div class="page-subtitle">Módulo em construção</div>
-      </div>
-    </div>
-    <div class="empty">
-      <div class="empty__icon">⚡</div>
-      <div class="empty__title">Módulo "${item.label}" aguardando implementação</div>
-      <p>Spec: <code>docs/cooperativa/07-modulos-funcionais.md</code></p>
-    </div>
-  `;
+function renderSidebar(active) {
+  const items = NAV.map(function(n) {
+    const cls = (active === n.href.replace('#/','') ? 'on' : '') + ' ' + (n.stub ? 'stub' : '');
+    const tail = n.stub ? ' <em>em breve</em>' : '';
+    return '<a href="' + n.href + '" class="' + cls.trim() + '"><span class="ic">' + n.icon + '</span>' + n.label + tail + '</a>';
+  }).join('');
+  return '<aside class="side"><div class="brand"><strong>JA</strong> Cooperativa</div><nav>' + items + '</nav><footer class="side-foot"><small>v0.3.0</small></footer></aside>';
 }
 
-async function boot() {
-  console.log('[JA Coop] booting v' + window.JA_COOP_CONFIG.app.version);
+function renderStub(name) {
+  return '<header class="pg-head"><h1>' + name + '</h1></header><section class="card"><p class="muted">Modulo planejado, ainda nao implementado. Specs em <code>docs/cooperativa/07-modulos-funcionais.md</code>.</p></section>';
+}
+
+async function dispatch() {
+  const r = parseRoute();
+  const main = document.getElementById('main');
+  document.getElementById('side-host').innerHTML = renderSidebar(r.module);
+  main.innerHTML = '<div class="loading">Carregando...</div>';
   try {
-    const u = await auth.user();
-    if (u) $('#user-info').textContent = u.email;
-    else   $('#user-info').textContent = 'modo demo · sem login';
-  } catch (e) { console.warn('[auth]', e.message); }
-
-  await renderPage();
-  window.addEventListener('hashchange', renderPage);
+    let html;
+    if (r.module === 'dashboard')       html = await renderDashboard();
+    else if (r.module === 'cooperados') html = r.a ? await renderCooperado360(r.a, r.b) : await renderCooperados();
+    else if (r.module === 'producao')   html = await renderProducao({ aba: r.a });
+    else if (r.module === 'entregas')   html = await renderEntregas({});
+    else {
+      const found = NAV.find(function(n){ return n.href === '#/' + r.module; });
+      html = renderStub(found ? found.label : r.module);
+    }
+    main.innerHTML = html;
+  } catch (e) {
+    console.error(e);
+    main.innerHTML = '<div class="error"><strong>Erro:</strong> ' + String(e.message || e) + '</div>';
+  }
 }
 
-document.addEventListener('DOMContentLoaded', boot);
+window.addEventListener('hashchange', dispatch);
+window.addEventListener('DOMContentLoaded', function() {
+  if (!location.hash) location.hash = '#/dashboard';
+  dispatch();
+});
