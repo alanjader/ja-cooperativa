@@ -1,0 +1,26 @@
+{
+  "_doc": "JA Cooperativa - parametros de runtime. NAO commitar com secret keys. Para trocar ambiente, mude apenas este arquivo.",
+  "app": {
+    "name": "JA Cooperativa",
+    "version": "0.4.0",
+    "env": "prod"
+  },
+  "supabase": {
+    "url": "https://gohoqgctcqltorfeohom.supabase.co",
+    "publishableKey": "sb_publishable_7SUqbx9ZQoa44Ohh_o6zmw_E_g8Vzl-",
+    "schema": "cooperativa"
+  },
+  "produtor": {
+    "url": "https://gohoqgctcqltorfeohom.supabase.co",
+    "schema": "public"
+  },
+  "features": {
+    "aiAgents": true,
+    "realtime": true,
+    "offline": false,
+    "blockchain": false
+  },
+  "dev": {
+    "cooperativaId": "00000000-0000-0000-0000-000000000001"
+  }
+}
