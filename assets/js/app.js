@@ -1,3 +1,63 @@
+// assets/js/app.js — Router + sidebar (8 modulos ativos)
+import { renderDashboard } from "./dashboard.js";
+import { renderCooperados } from "./cooperados.js";
+import { renderProducao } from "./producao.js";
+import { renderEntregas } from "./entregas.js";
+import { renderCertificacoes } from "./certificacoes.js";
+import { renderATR } from "./atr.js";
+import { renderQualidade } from "./qualidade.js";
+import { renderIA } from "./ia-operacional.js";
+
+const cfg = window.JA_COOP_CONFIG?.supabase || {};
+const supa = window.supabase.createClient(cfg.url, cfg.anonKey, { db: { schema: "cooperativa" } });
+
+const ROUTES = [
+  {h:"#/dashboard", l:"Dashboard", fn: renderDashboard, on:true},
+  {h:"#/cooperados", l:"Cooperados", fn: renderCooperados, on:true},
+  {h:"#/producao", l:"Producao", fn: renderProducao, on:true},
+  {h:"#/entregas", l:"Entregas", fn: renderEntregas, on:true},
+  {h:"#/comercial", l:"Comercial", on:false},
+  {h:"#/qualidade", l:"Qualidade", fn: renderQualidade, on:true},
+  {h:"#/certificacoes", l:"Certificacoes", fn: renderCertificacoes, on:true},
+  {h:"#/auditorias", l:"Auditorias", on:false},
+  {h:"#/atr", l:"ATR (Tecnica)", fn: renderATR, on:true},
+  {h:"#/documentos", l:"Documentos", on:false},
+  {h:"#/inteligencia", l:"Inteligencia", on:false},
+  {h:"#/alertas", l:"Alertas", on:false},
+  {h:"#/relatorios", l:"Relatorios", on:false},
+  {h:"#/ia", l:"IA Operacional", fn: renderIA, on:true}
+];
+
+function renderSidebar(active){
+  const side = document.querySelector(".sidebar");
+  if (!side) return;
+  let html = '<div class="brand">JA Cooperativa</div><nav>';
+  ROUTES.forEach(r=>{
+    const a = r.h===active? "active":"";
+    const tag = r.on? "" : ' <span class="soon">em breve</span>';
+    html += '<a href="'+r.h+'" class="'+a+(r.on?"":" off")+'">'+r.l+tag+'</a>';
+  });
+  html += '</nav>';
+  side.innerHTML = html;
+}
+
+async function route(){
+  const hash = location.hash || "#/dashboard";
+  renderSidebar(hash);
+  const host = document.querySelector("#side-host");
+  if (!host) return;
+  const route = ROUTES.find(x=>x.h===hash);
+  if (!route || !route.on){
+    host.innerHTML = '<header class="page-h"><h2>'+(route?.l||"Modulo")+'</h2></header><div class="soon-box">Modulo em desenvolvimento.</div>';
+    return;
+  }
+  try { await route.fn(supa, host); }
+  catch(e){ host.innerHTML = '<div class="err">Erro: '+e.message+'</div>'; console.error(e); }
+}
+
+window.addEventListener("hashchange", route);
+window.addEventListener("DOMContentLoaded", route);
+route();
 /* JA Cooperativa - App shell (hash router + sidebar) */
 import { renderDashboard } from './dashboard.js';
 import { renderCooperados, renderCooperado360 } from './cooperados.js';
