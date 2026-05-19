@@ -1,3 +1,82 @@
+// assets/js/app.js - Router + sidebar + Supabase client (aguarda config externo)
+import { renderDashboard } from "./dashboard.js";
+import { renderCooperados } from "./cooperados.js";
+import { renderProducao } from "./producao.js";
+import { renderEntregas } from "./entregas.js";
+import { renderCertificacoes } from "./certificacoes.js";
+import { renderATR } from "./atr.js";
+import { renderQualidade } from "./qualidade.js";
+import { renderIA } from "./ia-operacional.js";
+
+let supa = null;
+
+const ROUTES = [
+  {h:"#/dashboard", l:"Dashboard", fn: renderDashboard, on:true},
+  {h:"#/cooperados", l:"Cooperados", fn: renderCooperados, on:true},
+  {h:"#/producao", l:"Producao", fn: renderProducao, on:true},
+  {h:"#/entregas", l:"Entregas", fn: renderEntregas, on:true},
+  {h:"#/comercial", l:"Comercial", on:false},
+  {h:"#/qualidade", l:"Qualidade", fn: renderQualidade, on:true},
+  {h:"#/certificacoes", l:"Certificacoes", fn: renderCertificacoes, on:true},
+  {h:"#/auditorias", l:"Auditorias", on:false},
+  {h:"#/atr", l:"ATR (Tecnica)", fn: renderATR, on:true},
+  {h:"#/documentos", l:"Documentos", on:false},
+  {h:"#/inteligencia", l:"Inteligencia", on:false},
+  {h:"#/alertas", l:"Alertas", on:false},
+  {h:"#/relatorios", l:"Relatorios", on:false},
+  {h:"#/ia", l:"IA Operacional", fn: renderIA, on:true}
+];
+
+function renderSidebar(active){
+  const side = document.querySelector(".sidebar");
+  if (!side) return;
+  let html = '<div class="brand">JA Cooperativa</div><nav>';
+  ROUTES.forEach(r=>{
+    const a = r.h===active? "active":"";
+    const tag = r.on? "" : ' <span class="soon">em breve</span>';
+    html += '<a href="'+r.h+'" class="'+a+(r.on?"":" off")+'">'+r.l+tag+'</a>';
+  });
+  html += '</nav>';
+  side.innerHTML = html;
+}
+
+async function route(){
+  const hash = location.hash || "#/dashboard";
+  renderSidebar(hash);
+  const host = document.querySelector("#side-host");
+  if (!host) return;
+  if (!supa){ host.innerHTML = '<div class="loading">Inicializando…</div>'; return; }
+  const route = ROUTES.find(x=>x.h===hash);
+  if (!route || !route.on){
+    host.innerHTML = '<header class="page-h"><h2>'+(route?.l||"Modulo")+'</h2></header><div class="soon-box">Modulo em desenvolvimento.</div>';
+    return;
+  }
+  try { await route.fn(supa, host); }
+  catch(e){ host.innerHTML = '<div class="err">Erro: '+e.message+'</div>'; console.error(e); }
+}
+
+async function init(){
+  try {
+    if (!window.JA_COOP_CONFIG_READY) throw new Error("config.js loader nao executou");
+    const cfg = await window.JA_COOP_CONFIG_READY;
+    const sb = cfg.supabase || {};
+    const key = sb.publishableKey || sb.anonKey;
+    if (!sb.url || !key) throw new Error("supabase.url ou supabase.publishableKey ausente em parametros.json");
+    supa = window.supabase.createClient(sb.url, key, { db: { schema: sb.schema || "cooperativa" } });
+    window.addEventListener("hashchange", route);
+    route();
+  } catch(e){
+    const host = document.querySelector("#side-host") || document.body;
+    host.innerHTML = '<div class="err" style="margin:32px;padding:24px">Erro de inicializacao: '+e.message+'</div>';
+    console.error("[app] init failed:", e);
+  }
+}
+
+if (document.readyState === "loading"){
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
 // assets/js/app.js - Router + sidebar (8 modulos ativos) + Supabase client
 import { renderDashboard } from "./dashboard.js";
 import { renderCooperados } from "./cooperados.js";
