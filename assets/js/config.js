@@ -9,7 +9,7 @@ window.JA_COOP_CONFIG = {
   },
   supabase: {
     // MESMO projeto Supabase do Produtor
-    url: 'https://zpgabskeunywcgtojcrg.supabase.co',
+    url: 'https://gohoqgctcqltorfeohom.supabase.co',
     // TODO: trocar pela anon key real (segura para client)
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.PLACEHOLDER_ANON_KEY',
     // Schema dedicado deste módulo
